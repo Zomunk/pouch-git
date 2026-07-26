@@ -844,6 +844,29 @@ describe("content", () => {
 			});
 		});
 
+		it("normalizes a wrong media path to the media record's r2Key", async () => {
+			await createCollection({
+				slug: "articles",
+				name: "Articles",
+				schema: mediaCollectionSchema,
+			});
+
+			const file = new File(["cover"], "cover.png", { type: "image/png" });
+			const media = await createMedia(file);
+
+			const content = await createContent("articles", {
+				data: {
+					title: "Article",
+					cover: { id: media.id, path: "anything-goes.txt" },
+				},
+			});
+
+			expect(content.data.cover).toEqual({
+				id: media.id,
+				path: `${env.MEDIA_PUBLIC_URL}/${media.r2Key}`,
+			});
+		});
+
 		it("rejects content with a missing media reference", async () => {
 			await createCollection({
 				slug: "articles",

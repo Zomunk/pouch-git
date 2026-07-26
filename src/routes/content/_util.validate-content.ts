@@ -41,6 +41,38 @@ export const validateContentOrFail = (input: {
 	return ok(undefined);
 };
 
+type MediaRow = { id: string; r2Key: string };
+
+/**
+ * Rewrites the `path` of every media reference in `items` to the media
+ * record's r2Key, so a stale or bogus client-supplied path cannot persist.
+ */
+const normalizeMediaPaths = (input: {
+	items: Record<string, unknown>[];
+	mediaFields: Array<{ field: string; isMany: boolean }>;
+	rows: MediaRow[];
+}): void => {
+	const pathById = new Map(input.rows.map((r) => [r.id, r.r2Key]));
+
+	for (const item of input.items) {
+		for (const { field, isMany } of input.mediaFields) {
+			const value = item[field];
+			if (value === undefined) {
+				continue;
+			}
+
+			if (isMany) {
+				item[field] = (value as Array<{ id: string; path: string }>).map(
+					(ref) => ({ ...ref, path: pathById.get(ref.id) ?? ref.path }),
+				);
+			} else {
+				const ref = value as { id: string; path: string };
+				item[field] = { ...ref, path: pathById.get(ref.id) ?? ref.path };
+			}
+		}
+	}
+};
+
 export const validateMediaFieldsOrFail = (input: {
 	data: Record<string, unknown>;
 	schema: Record<string, unknown>;
@@ -97,6 +129,8 @@ export const validateMediaFieldsOrFail = (input: {
 				}),
 			);
 		}
+
+		normalizeMediaPaths({ items: [input.data], mediaFields, rows });
 
 		return okAsync(undefined);
 	});
@@ -167,6 +201,8 @@ export const validateMediaFieldsForBatch = (input: {
 					}),
 				);
 			}
+
+			normalizeMediaPaths({ items: input.items, mediaFields, rows });
 
 			return okAsync(undefined);
 		});
