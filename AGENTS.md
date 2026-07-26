@@ -33,7 +33,7 @@ Collection schemas are standard JSON Schema (draft 2020-12). CMS-specific behavi
 - `x-label` — display name for the field. Property keys are immutable; labels are mutable.
 - `x-widget` — authoring hint only. `"richtext"` is the only supported value today.
 - `x-relation` — target collection slug. `type: "string"` = single relation; `type: "array"` = many.
-- `x-index` — scalar fields only (`string`, `integer`, `number`, `boolean`). Creates a generated column + index for filtering.
+- `x-index` — scalar fields only (`string`, `integer`, `number`, `boolean`). Creates an expression index on `json_extract(data, '$.<field>')` for filtering. No generated columns.
 - `x-media` — marks an object field as a media reference. The stored value must be `{ id: "med_...", path: string }`. Use `type: "array"` for many media references. On write, `path` is normalized to the media record's `r2Key` (client-supplied paths are not trusted). Request `?resolve=<field>` to expand it into the full media record(s).
 
 ```jsonc
@@ -159,4 +159,4 @@ For contributor-facing how-tos (adding routes, scopes, DB changes), see [CONTRIB
 - Schema-mutation concurrency lock.
 - JWT revocation / blocklist.
 - Idempotency keys on writes.
-- Per-collection views or ad-hoc generated columns outside `x-index`.
+- Per-collection views or generated columns.

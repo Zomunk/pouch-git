@@ -29,7 +29,7 @@ const baseInfo = {
 	title: "pouch",
 	version: packageJson.version,
 	description:
-		"API-first headless CMS backed by Cloudflare D1. All endpoints except /auth/keys require a Bearer token with the appropriate scope. Read-after-write consistency across D1 replicas is supported via the x-d1-bookmark header. Collection schemas are standard JSON Schema with five CMS extensions: x-label (display name), x-widget (authoring hint, e.g. richtext), x-relation (target collection slug), x-index (filterable generated column), and x-media (media reference).",
+		"API-first headless CMS backed by Cloudflare D1. All endpoints except /auth/keys require a Bearer token with the appropriate scope. Read-after-write consistency across D1 replicas is supported via the x-d1-bookmark header. Collection schemas are standard JSON Schema with five CMS extensions: x-label (display name), x-widget (authoring hint, e.g. richtext), x-relation (target collection slug), x-index (filterable expression index), and x-media (media reference).",
 };
 
 const tags = [
