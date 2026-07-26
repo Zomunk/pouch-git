@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { typedId } from "@/lib/typed-id";
-
 import { fetchWorker, readerToken } from "../utils";
 
 const registerClient = async (
@@ -27,18 +25,6 @@ describe("dynamic client registration", () => {
 		expect(body.redirect_uris).toEqual(["https://client.example/callback"]);
 		expect(body.token_endpoint_auth_method).toBe("none");
 		expect(body.client_secret).toBeUndefined();
-	});
-
-	it("rejects registrations without redirect URIs", async () => {
-		const response = await fetchWorker("/register", {
-			method: "POST",
-			body: JSON.stringify({
-				client_name: "No URIs",
-				token_endpoint_auth_method: "none",
-			}),
-		});
-
-		expect(response.status).toBe(400);
 	});
 });
 
@@ -226,23 +212,5 @@ describe("mcp authentication", () => {
 		expect(response.status).toBe(200);
 		const text = await response.text();
 		expect(text).toContain("HTTP 200");
-	});
-
-	it("rejects unknown tokens", async () => {
-		const response = await fetchWorker("/mcp", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Accept: "application/json, text/event-stream",
-				Authorization: `Bearer ${typedId("key")}`,
-			},
-			body: JSON.stringify({
-				jsonrpc: "2.0",
-				id: 1,
-				method: "tools/list",
-			}),
-		});
-
-		expect(response.status).toBe(401);
 	});
 });

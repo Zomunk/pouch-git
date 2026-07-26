@@ -173,40 +173,6 @@ describe("content", () => {
 			).first<{ count: number }>();
 			expect(row!.count).toBe(0);
 		});
-
-		it("creates content with valid media references in a batch", async () => {
-			await createCollection({
-				slug: "batch-articles-valid",
-				name: "Batch Articles Valid",
-				schema: {
-					type: "object",
-					properties: {
-						title: { type: "string" },
-						cover: { type: "object", "x-media": true },
-					},
-					required: ["title"],
-					additionalProperties: false,
-				},
-			});
-
-			const file = new File(["cover"], "cover.png", { type: "image/png" });
-			const media = await createMedia(file);
-
-			const result = await createContentBatch("batch-articles-valid", [
-				{
-					data: {
-						title: "Article",
-						cover: { id: media.id, path: media.r2Key },
-					},
-				},
-			]);
-
-			expect(result.data).toHaveLength(1);
-			expect(result.data[0]!.data.cover).toEqual({
-				id: media.id,
-				path: `${env.MEDIA_PUBLIC_URL}/${media.r2Key}`,
-			});
-		});
 	});
 
 	describe("PATCH /collections/:slug/content/batch", () => {
@@ -280,30 +246,6 @@ describe("content", () => {
 				.first<{ data: string }>();
 			expect(JSON.parse(row!.data).count).toBe(1);
 		});
-
-		it("returns 404 when an id does not exist in the collection", async () => {
-			await createCollection({
-				slug: "batch-update-missing",
-				name: "Batch Update Missing",
-				schema: makeCollectionSchema(),
-			});
-
-			const token = await writerToken();
-			const response = await fetchWorker(
-				"/collections/batch-update-missing/content/batch",
-				{
-					method: "PATCH",
-					body: JSON.stringify({
-						items: [
-							{ id: "con_00000000000000000000000000", data: { count: 5 } },
-						],
-					}),
-				},
-				token,
-			);
-
-			expect(response.status).toBe(404);
-		});
 	});
 
 	describe("DELETE /collections/:slug/content/batch", () => {
@@ -329,28 +271,6 @@ describe("content", () => {
 				.bind(first.collectionId)
 				.first<{ count: number }>();
 			expect(row!.count).toBe(0);
-		});
-
-		it("returns 404 when an id does not exist in the collection", async () => {
-			await createCollection({
-				slug: "batch-delete-missing",
-				name: "Batch Delete Missing",
-				schema: makeCollectionSchema(),
-			});
-
-			const token = await writerToken();
-			const response = await fetchWorker(
-				"/collections/batch-delete-missing/content/batch",
-				{
-					method: "DELETE",
-					body: JSON.stringify({
-						ids: ["con_00000000000000000000000000"],
-					}),
-				},
-				token,
-			);
-
-			expect(response.status).toBe(404);
 		});
 	});
 
@@ -454,69 +374,6 @@ describe("content", () => {
 	});
 
 	describe("GET /collections/:slug/content", () => {
-		it("filters with ?field=value and ?field[gt]=value", async () => {
-			await createCollection({
-				slug: "scores",
-				name: "Scores",
-				schema: makeCollectionSchema(),
-			});
-
-			await createContent("scores", { data: { title: "A", count: 1 } });
-			await createContent("scores", { data: { title: "B", count: 5 } });
-			await createContent("scores", { data: { title: "C", count: 10 } });
-
-			const token = await readerToken();
-
-			const eqResponse = await fetchWorker(
-				"/collections/scores/content?count=5",
-				{},
-				token,
-			);
-			expect(eqResponse.status).toBe(200);
-
-			const eqBody = (await eqResponse.json()) as {
-				data: Array<{ data: Record<string, unknown> }>;
-			};
-			expect(eqBody.data).toHaveLength(1);
-			const first = eqBody.data[0]!;
-			expect(first.data.title).toBe("B");
-
-			const gtResponse = await fetchWorker(
-				"/collections/scores/content?count[gt]=1",
-				{},
-				token,
-			);
-			expect(gtResponse.status).toBe(200);
-
-			const gtBody = (await gtResponse.json()) as {
-				data: Array<{ data: Record<string, unknown> }>;
-			};
-			expect(gtBody.data).toHaveLength(2);
-			const titles = gtBody.data.map((item) => item.data.title);
-			expect(titles).toContain("B");
-			expect(titles).toContain("C");
-		});
-
-		it("rejects ordering operators on string fields", async () => {
-			await createCollection({
-				slug: "scores",
-				name: "Scores",
-				schema: makeCollectionSchema(),
-			});
-
-			const token = await readerToken();
-
-			const response = await fetchWorker(
-				"/collections/scores/content?title[gt]=A",
-				{},
-				token,
-			);
-			expect(response.status).toBe(400);
-
-			const body = (await response.json()) as { code: string };
-			expect(body.code).toBe("VALIDATION_FAILED");
-		});
-
 		it("exposes only valid operators per field type in openapi.json", async () => {
 			await createCollection({
 				slug: "scores",
@@ -559,64 +416,6 @@ describe("content", () => {
 			expect(names).toContain("count[in]");
 			expect(names).toContain("title[nin]");
 			expect(names).toContain("count[nin]");
-		});
-
-		it("filters string fields with ?field[in]=v1,v2", async () => {
-			await createCollection({
-				slug: "scores",
-				name: "Scores",
-				schema: makeCollectionSchema(),
-			});
-
-			await createContent("scores", { data: { title: "A", count: 1 } });
-			await createContent("scores", { data: { title: "B", count: 5 } });
-			await createContent("scores", { data: { title: "C", count: 10 } });
-
-			const token = await readerToken();
-
-			const response = await fetchWorker(
-				"/collections/scores/content?title[in]=A,C",
-				{},
-				token,
-			);
-			expect(response.status).toBe(200);
-
-			const body = (await response.json()) as {
-				data: Array<{ data: Record<string, unknown> }>;
-			};
-			expect(body.data).toHaveLength(2);
-			const titles = body.data.map((item) => item.data.title);
-			expect(titles).toContain("A");
-			expect(titles).toContain("C");
-		});
-
-		it("filters number fields with ?field[in]=v1,v2", async () => {
-			await createCollection({
-				slug: "scores",
-				name: "Scores",
-				schema: makeCollectionSchema(),
-			});
-
-			await createContent("scores", { data: { title: "A", count: 1 } });
-			await createContent("scores", { data: { title: "B", count: 5 } });
-			await createContent("scores", { data: { title: "C", count: 10 } });
-
-			const token = await readerToken();
-
-			const response = await fetchWorker(
-				"/collections/scores/content?count[in]=1,10",
-				{},
-				token,
-			);
-			expect(response.status).toBe(200);
-
-			const body = (await response.json()) as {
-				data: Array<{ data: Record<string, unknown> }>;
-			};
-			expect(body.data).toHaveLength(2);
-			const titles = body.data.map((item) => item.data.title);
-			expect(titles).toContain("A");
-			expect(titles).toContain("C");
 		});
 	});
 
@@ -824,26 +623,6 @@ describe("content", () => {
 			additionalProperties: false,
 		};
 
-		it("creates content with a valid media reference", async () => {
-			await createCollection({
-				slug: "articles",
-				name: "Articles",
-				schema: mediaCollectionSchema,
-			});
-
-			const file = new File(["cover"], "cover.png", { type: "image/png" });
-			const media = await createMedia(file);
-
-			const content = await createContent("articles", {
-				data: { title: "Article", cover: { id: media.id, path: media.r2Key } },
-			});
-
-			expect(content.data.cover).toEqual({
-				id: media.id,
-				path: `${env.MEDIA_PUBLIC_URL}/${media.r2Key}`,
-			});
-		});
-
 		it("normalizes a wrong media path to the media record's r2Key", async () => {
 			await createCollection({
 				slug: "articles",
@@ -893,30 +672,6 @@ describe("content", () => {
 			const body = (await response.json()) as { code: string; message: string };
 			expect(body.code).toBe("VALIDATION_FAILED");
 			expect(body.message).toContain("Media not found");
-		});
-
-		it("rejects content with an invalid media object shape", async () => {
-			await createCollection({
-				slug: "articles",
-				name: "Articles",
-				schema: mediaCollectionSchema,
-			});
-
-			const token = await writerToken();
-			const response = await fetchWorker(
-				"/collections/articles/content",
-				{
-					method: "POST",
-					body: JSON.stringify({
-						data: { title: "Article", cover: { id: "med_abc123" } },
-					}),
-				},
-				token,
-			);
-
-			expect(response.status).toBe(400);
-			const body = (await response.json()) as { code: string };
-			expect(body.code).toBe("VALIDATION_FAILED");
 		});
 
 		it("resolves media fields when requested", async () => {

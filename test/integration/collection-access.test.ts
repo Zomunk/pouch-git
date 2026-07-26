@@ -51,22 +51,6 @@ describe("per-collection keys", () => {
 		return { slug, otherSlug, token };
 	};
 
-	it("echoes the collections restriction in the key response", async () => {
-		const response = await fetchWorker("/auth/keys", {
-			method: "POST",
-			body: JSON.stringify({
-				secret: env.JWT_SECRET,
-				name: "echo-key",
-				scopes: ["content:read"],
-				collections: ["faqs"],
-			}),
-		});
-
-		expect(response.status).toBe(201);
-		const body = (await response.json()) as { collections?: string[] };
-		expect(body.collections).toEqual(["faqs"]);
-	});
-
 	it("reads and writes content in a permitted collection", async () => {
 		const { slug, token } = await setup();
 

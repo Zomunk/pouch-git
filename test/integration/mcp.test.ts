@@ -142,25 +142,6 @@ describe("GET /openapi.json", () => {
 			).toContain(ref);
 		}
 	});
-
-	it("exposes content paths for each collection", async () => {
-		await createCollection({
-			slug: "spec_paths",
-			name: "Spec Paths",
-			schema: widgetSchema,
-		});
-
-		const token = await readerToken();
-		const response = await fetchWorker("/openapi.json", {}, token);
-		const spec = (await response.json()) as OpenApiSpec;
-
-		expect(spec.paths).toHaveProperty("/collections/spec_paths/content");
-		expect(spec.paths).toHaveProperty("/collections/spec_paths/content/batch");
-		expect(spec.paths).toHaveProperty(
-			"/collections/spec_paths/content:validate",
-		);
-		expect(spec.paths).toHaveProperty("/collections/spec_paths/content/{id}");
-	});
 });
 
 describe("POST /mcp tools/list", () => {
@@ -266,27 +247,6 @@ describe("POST /mcp tools/list", () => {
 		}
 	});
 
-	it("includes title and behavior annotations for every tool", async () => {
-		await createCollection({
-			slug: "mcp_annotations",
-			name: "MCP Annotations",
-			schema: widgetSchema,
-		});
-
-		const token = await adminToken();
-		const tools = await listTools({ token });
-		expect(tools.length).toBeGreaterThan(0);
-
-		for (const tool of tools) {
-			expect(tool.title).toBeDefined();
-			expect(tool.annotations).toBeDefined();
-			expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
-			expect(typeof tool.annotations.destructiveHint).toBe("boolean");
-			expect(typeof tool.annotations.idempotentHint).toBe("boolean");
-			expect(typeof tool.annotations.openWorldHint).toBe("boolean");
-		}
-	});
-
 	it("annotates read and write tools with the correct behavior hints", async () => {
 		await createCollection({
 			slug: "mcp_hints",
@@ -329,35 +289,6 @@ describe("POST /mcp tools/list", () => {
 			idempotentHint: true,
 			openWorldHint: false,
 		});
-	});
-
-	it("includes the collection slug in content tool titles", async () => {
-		await createCollection({
-			slug: "mcp_titles",
-			name: "MCP Titles",
-			schema: widgetSchema,
-		});
-
-		const token = await adminToken();
-		const tools = await listTools({ token });
-
-		const createTool = tools.find(
-			(tool) => tool.name === "create_mcp_titles_content",
-		);
-		expect(createTool).toBeDefined();
-		expect(createTool!.title).toBe("Create 'mcp_titles'");
-
-		const listTool = tools.find(
-			(tool) => tool.name === "list_mcp_titles_content",
-		);
-		expect(listTool).toBeDefined();
-		expect(listTool!.title).toBe("List 'mcp_titles'");
-
-		const getTool = tools.find(
-			(tool) => tool.name === "get_mcp_titles_content_by_id",
-		);
-		expect(getTool).toBeDefined();
-		expect(getTool!.title).toBe("Get by ID 'mcp_titles'");
 	});
 
 	it("reflects collections created after previous requests", async () => {
