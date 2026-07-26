@@ -115,6 +115,21 @@ const buildContentQueryParameters = (
 		},
 	];
 
+	const statusSchema = {
+		type: "string",
+		enum: ["draft", "published", "archived"],
+		description: "Filter by content status.",
+	};
+
+	for (const op of ["eq", "ne", "in", "nin"]) {
+		parameters.push({
+			name: op === "eq" ? "status" : `status[${op}]`,
+			in: "query",
+			required: false,
+			schema: statusSchema,
+		});
+	}
+
 	if (!schema.properties || typeof schema.properties !== "object") {
 		return parameters;
 	}

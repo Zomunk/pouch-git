@@ -631,4 +631,112 @@ describe("filtering", () => {
 			expect(body.code).toBe("VALIDATION_FAILED");
 		});
 	});
+
+	describe("status filter", () => {
+		const makeSchema = () => ({
+			type: "object",
+			properties: {
+				title: { type: "string" },
+			},
+			required: ["title"],
+			additionalProperties: false,
+		});
+
+		it("filters with ?status=published", async () => {
+			await createCollection({
+				slug: "filter-status-eq",
+				name: "Filter Status Eq",
+				schema: makeSchema(),
+			});
+
+			await createContent("filter-status-eq", {
+				data: { title: "A" },
+				status: "published",
+			});
+			await createContent("filter-status-eq", { data: { title: "B" } });
+
+			const token = await readerToken();
+			const response = await fetchWorker(
+				"/collections/filter-status-eq/content?status=published",
+				{},
+				token,
+			);
+			expect(response.status).toBe(200);
+
+			const body = (await response.json()) as {
+				data: Array<{ data: Record<string, unknown> }>;
+			};
+			expect(titles(body)).toEqual(["A"]);
+		});
+
+		it("filters with ?status[in]=draft,archived", async () => {
+			await createCollection({
+				slug: "filter-status-in",
+				name: "Filter Status In",
+				schema: makeSchema(),
+			});
+
+			await createContent("filter-status-in", {
+				data: { title: "A" },
+				status: "published",
+			});
+			await createContent("filter-status-in", { data: { title: "B" } });
+			await createContent("filter-status-in", {
+				data: { title: "C" },
+				status: "archived",
+			});
+
+			const token = await readerToken();
+			const response = await fetchWorker(
+				"/collections/filter-status-in/content?status[in]=draft,archived",
+				{},
+				token,
+			);
+			expect(response.status).toBe(200);
+
+			const body = (await response.json()) as {
+				data: Array<{ data: Record<string, unknown> }>;
+			};
+			expect(titles(body)).toEqual(expect.arrayContaining(["B", "C"]));
+			expect(body.data).toHaveLength(2);
+		});
+
+		it("rejects an invalid status value", async () => {
+			await createCollection({
+				slug: "filter-status-invalid",
+				name: "Filter Status Invalid",
+				schema: makeSchema(),
+			});
+
+			const token = await readerToken();
+			const response = await fetchWorker(
+				"/collections/filter-status-invalid/content?status=nope",
+				{},
+				token,
+			);
+			expect(response.status).toBe(400);
+
+			const body = (await response.json()) as { code: string };
+			expect(body.code).toBe("VALIDATION_FAILED");
+		});
+
+		it("rejects ordering operators on status", async () => {
+			await createCollection({
+				slug: "filter-status-gt",
+				name: "Filter Status Gt",
+				schema: makeSchema(),
+			});
+
+			const token = await readerToken();
+			const response = await fetchWorker(
+				"/collections/filter-status-gt/content?status[gt]=draft",
+				{},
+				token,
+			);
+			expect(response.status).toBe(400);
+
+			const body = (await response.json()) as { code: string };
+			expect(body.code).toBe("VALIDATION_FAILED");
+		});
+	});
 });

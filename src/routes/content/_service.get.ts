@@ -8,11 +8,13 @@ import {
 	isFilterOperator,
 } from "@/lib/query-filter";
 import { enrichMediaPaths } from "@/lib/schema";
+import { isValid } from "@/lib/validator";
 
 import type { CollectionSlugParam } from "@/routes/collection/_schema";
 import { requireCollectionBySlug } from "@/routes/collection/_util.require-collection";
 
 import type { ContentListResponse, ContentQuery } from "./_schema";
+import { contentStatusSchema } from "./_schema";
 import { resolveRelations } from "./_service.resolve";
 import { normalizeResolveParam } from "./_util.normalize-resolve";
 import type { Deps } from "@/deps";
@@ -129,6 +131,39 @@ export const listContent = (
 			}
 
 			const property = properties[field] as Record<string, unknown> | undefined;
+
+			if (field === "status") {
+				const allowed = ["eq", "ne", "in", "nin"];
+
+				if (!allowed.includes(op)) {
+					return err(
+						new AppHTTPException({
+							code: ErrorCodes.VALIDATION_FAILED,
+							message: `Operator ${op} is not allowed for field status`,
+							status: 400,
+						}),
+					);
+				}
+
+				const value = coerceFilterValue({ rawValue, op, type: "string" });
+				const values = Array.isArray(value) ? value : [value];
+
+				if (
+					values.length === 0 ||
+					values.some((v) => !isValid(v, contentStatusSchema))
+				) {
+					return err(
+						new AppHTTPException({
+							code: ErrorCodes.VALIDATION_FAILED,
+							message: `Invalid status value: ${values.join(", ")}`,
+							status: 400,
+						}),
+					);
+				}
+
+				filters.push({ field, op, value, column: "status" });
+				continue;
+			}
 
 			if (!property) {
 				return err(

@@ -86,6 +86,8 @@ Content list endpoints accept `?field=value` (equality) and `?field[op]=value`. 
 - `string` (all other): `eq`, `ne`, `in`, `nin`
 - `array`, `object`: not filterable
 
+The top-level `status` field is also filterable (`eq`, `ne`, `in`, `nin`); it takes precedence over a schema property named `status`.
+
 Both the request validator in `src/routes/content/_service.get.ts` and the OpenAPI generator in `src/routes/content/_openapi.ts` must derive allowed operators from the same mapping in `src/lib/query-filter.ts`.
 
 ## Schema philosophy

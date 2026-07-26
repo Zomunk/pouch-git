@@ -15,6 +15,8 @@ export type ContentFilter = {
 	field: string;
 	op: "eq" | "gt" | "gte" | "in" | "lt" | "lte" | "ne" | "nin";
 	value: string | number | boolean | (string | number | boolean)[];
+	/** When set, the filter targets a top-level content column instead of `data`. */
+	column?: "status";
 };
 
 const OP_MAP: Record<Exclude<ContentFilter["op"], "in" | "nin">, string> = {
@@ -27,7 +29,10 @@ const OP_MAP: Record<Exclude<ContentFilter["op"], "in" | "nin">, string> = {
 };
 
 const getFilterExpression = (filter: ContentFilter) => {
-	const expression = buildJsonExtractExpression({ field: filter.field });
+	const expression =
+		filter.column === "status"
+			? "status"
+			: buildJsonExtractExpression({ field: filter.field });
 
 	if (filter.op === "in" || filter.op === "nin") {
 		const values = Array.isArray(filter.value) ? filter.value : [filter.value];
