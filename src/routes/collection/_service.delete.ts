@@ -46,6 +46,18 @@ export const deleteCollection = (
 			});
 		}
 
+		if (input.isForced) {
+			yield* deps.DL.content.deleteContentByCollectionId(
+				{ collectionId: collection.id },
+				{
+					action: "content.delete",
+					actor: deps.actor,
+					targetId: collection.id,
+					diff: null,
+				},
+			);
+		}
+
 		yield* deps.DL.collection.deleteCollectionById(
 			{ id: collection.id },
 			{

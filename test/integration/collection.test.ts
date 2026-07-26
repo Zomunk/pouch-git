@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { adminToken, createCollection, fetchWorker } from "../utils.js";
+import {
+	adminToken,
+	createCollection,
+	createContent,
+	createMedia,
+	fetchWorker,
+} from "../utils.js";
 import { env } from "cloudflare:test";
 
 describe("collections", () => {
@@ -182,6 +188,46 @@ describe("collections", () => {
 			expect(body.currentSchemaVersionId).not.toBe(
 				collection.currentSchemaVersionId,
 			);
+		});
+	});
+
+	describe("DELETE /collections/:slug", () => {
+		it("force-deleting a collection deletes its content, freeing referenced media", async () => {
+			await createCollection({
+				slug: "force-delete-cascade",
+				name: "Force Delete Cascade",
+				schema: {
+					type: "object",
+					properties: {
+						title: { type: "string" },
+						cover: { type: "object", "x-media": true },
+					},
+					required: ["title"],
+					additionalProperties: false,
+				},
+			});
+
+			const media = await createMedia(
+				new File(["img"], "cover.png", { type: "image/png" }),
+			);
+			await createContent("force-delete-cascade", {
+				data: { title: "A", cover: { id: media.id, path: media.r2Key } },
+			});
+
+			const token = await adminToken();
+			const deleteResponse = await fetchWorker(
+				"/collections/force-delete-cascade?force=true",
+				{ method: "DELETE" },
+				token,
+			);
+			expect(deleteResponse.status).toBe(204);
+
+			const mediaResponse = await fetchWorker(
+				`/media/${media.id}`,
+				{ method: "DELETE" },
+				token,
+			);
+			expect(mediaResponse.status).toBe(204);
 		});
 	});
 });

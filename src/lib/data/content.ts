@@ -343,6 +343,30 @@ export class ContentDataLayer extends BaseDataLayer {
 		);
 	}
 
+	deleteContentByCollectionId(
+		input: { collectionId: string },
+		audit: AuditLogEvent,
+	) {
+		return fromPromise(
+			(async () => {
+				const mutation = this.db
+					.deleteFrom("content")
+					.where("collection_id", "=", input.collectionId);
+
+				await this.batch([
+					mutation,
+					AuditLogDataLayer.createInsert(this.db, audit),
+				] as const);
+			})(),
+			this.passThroughError({
+				message: "Failed to delete content by collection ID",
+				code: "DELETE_FAILED",
+				source: "DL.content.deleteContentByCollectionId",
+				input,
+			}),
+		);
+	}
+
 	countContentByMediaId(input: { mediaId: string }) {
 		const quotedId = JSON.stringify(input.mediaId);
 		return fromPromise(
