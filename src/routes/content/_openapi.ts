@@ -124,6 +124,17 @@ const buildContentQueryParameters = (
 					"Sort order. Prefix with - for descending. Defaults to newest first.",
 			},
 		},
+		{
+			name: "direction",
+			in: "query",
+			required: false,
+			schema: {
+				type: "string",
+				enum: ["forward", "backward"],
+				description:
+					"Pagination direction. Use backward with a prevCursor to page to newer items. Defaults to forward.",
+			},
+		},
 	];
 
 	const statusSchema = {
@@ -488,10 +499,15 @@ export const buildContentPaths = (input: {
 											nextCursor: {
 												type: ["string", "null"],
 												description:
-													"ID cursor for the next page, or null if there are no more items.",
+													"Cursor for the next page, or null if there are no more items.",
+											},
+											prevCursor: {
+												type: ["string", "null"],
+												description:
+													"Cursor for the previous page (use with direction=backward), or null on the first page.",
 											},
 										},
-										required: ["data", "nextCursor"],
+										required: ["data", "nextCursor", "prevCursor"],
 										additionalProperties: false,
 									},
 								},

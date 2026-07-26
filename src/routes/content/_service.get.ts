@@ -59,7 +59,13 @@ const coerceFilterValue = (input: {
 	return coerceValue(stringValue, input.type);
 };
 
-const QUERY_META_KEYS = new Set(["resolve", "limit", "cursor", "sort"]);
+const QUERY_META_KEYS = new Set([
+	"resolve",
+	"limit",
+	"cursor",
+	"sort",
+	"direction",
+]);
 
 const SORT_COLUMNS: Record<string, ContentSort["column"]> = {
 	createdAt: "created_at",
@@ -261,6 +267,32 @@ export const listContent = (
 			return err(sortError);
 		}
 
+		const directionRaw = input.query.direction;
+		const direction =
+			directionRaw === undefined
+				? "forward"
+				: String(Array.isArray(directionRaw) ? directionRaw[0] : directionRaw);
+
+		if (direction !== "forward" && direction !== "backward") {
+			return err(
+				new AppHTTPException({
+					code: ErrorCodes.VALIDATION_FAILED,
+					message: `Invalid direction: ${direction} (allowed: forward, backward)`,
+					status: 400,
+				}),
+			);
+		}
+
+		if (direction === "backward" && cursor === undefined) {
+			return err(
+				new AppHTTPException({
+					code: ErrorCodes.VALIDATION_FAILED,
+					message: "cursor is required when direction=backward",
+					status: 400,
+				}),
+			);
+		}
+
 		let sortCursor: SortCursor | undefined;
 
 		if (sort !== undefined && cursor !== undefined) {
@@ -279,14 +311,17 @@ export const listContent = (
 			sortCursor = decoded;
 		}
 
-		const { rows, nextCursor } = yield* deps.DL.content.listContent({
-			collectionId: collection.id,
-			filters,
-			limit,
-			cursor,
-			sort,
-			sortCursor,
-		});
+		const { rows, nextCursor, prevCursor } = yield* deps.DL.content.listContent(
+			{
+				collectionId: collection.id,
+				filters,
+				limit,
+				cursor,
+				sort,
+				sortCursor,
+				direction,
+			},
+		);
 
 		const enrichedRows = rows.map((row) => ({
 			...row,
@@ -300,7 +335,7 @@ export const listContent = (
 		const resolve = normalizeResolveParam(input.query.resolve);
 
 		if (!resolve) {
-			return ok({ data: enrichedRows, nextCursor });
+			return ok({ data: enrichedRows, nextCursor, prevCursor });
 		}
 
 		const resolved = yield* resolveRelations(
@@ -312,5 +347,5 @@ export const listContent = (
 			deps,
 		);
 
-		return ok({ data: resolved, nextCursor });
+		return ok({ data: resolved, nextCursor, prevCursor });
 	});

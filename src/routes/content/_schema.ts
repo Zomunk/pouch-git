@@ -127,6 +127,7 @@ export const contentQuerySchema = Type.Object(
 			Type.Union([Type.String(), Type.Array(Type.String())]),
 		),
 		sort: Type.Optional(Type.String()),
+		direction: Type.Optional(Type.String()),
 	},
 	{ additionalProperties: true },
 );
@@ -137,6 +138,7 @@ export const contentListResponseSchema = Type.Object(
 	{
 		data: Type.Array(contentResponseSchema),
 		nextCursor: Type.Union([Type.String(), Type.Null()]),
+		prevCursor: Type.Union([Type.String(), Type.Null()]),
 	},
 	{ additionalProperties: false },
 );

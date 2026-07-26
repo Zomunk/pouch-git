@@ -124,20 +124,24 @@ export class ContentDataLayer extends BaseDataLayer {
 		cursor?: string;
 		sort?: ContentSort;
 		sortCursor?: SortCursor;
+		direction?: "forward" | "backward";
 	}) {
 		const pageSize = input.limit;
 		const sort = input.sort;
 		const sortCursor = input.sortCursor;
+		const direction = input.direction ?? "forward";
+		const backward = direction === "backward";
 
 		return fromPromise(
 			this.contentQuery
 				.where("collection_id", "=", input.collectionId)
 				.$if(input.cursor !== undefined && sort === undefined, (q) =>
-					q.where("id", "<", input.cursor!),
+					q.where("id", backward ? ">" : "<", input.cursor!),
 				)
 				.$if(sort !== undefined && sortCursor !== undefined, (q) => {
-					const { column, direction } = sort!;
-					const cmp = direction === "asc" ? ">" : "<";
+					const { column, direction: sortDirection } = sort!;
+					const asc = sortDirection === "asc";
+					const cmp = backward ? (asc ? "<" : ">") : asc ? ">" : "<";
 
 					return q.where(
 						sql<boolean>`(${sql.ref(column)} ${sql.raw(cmp)} ${sortCursor!.value}) OR (${sql.ref(column)} = ${sortCursor!.value} AND id ${sql.raw(cmp)} ${sortCursor!.id})`,
@@ -152,10 +156,18 @@ export class ContentDataLayer extends BaseDataLayer {
 
 					return filtered;
 				})
-				.$if(sort === undefined, (q) => q.orderBy("id", "desc"))
-				.$if(sort !== undefined, (q) =>
-					q.orderBy(sort!.column, sort!.direction).orderBy("id", sort!.direction),
+				.$if(sort === undefined, (q) =>
+					q.orderBy("id", backward ? "asc" : "desc"),
 				)
+				.$if(sort !== undefined, (q) => {
+					const order = backward
+						? sort!.direction === "asc"
+							? "desc"
+							: "asc"
+						: sort!.direction;
+
+					return q.orderBy(sort!.column, order).orderBy("id", order);
+				})
 				.limit(pageSize + 1)
 				.execute(),
 			this.passThroughError({
@@ -164,23 +176,38 @@ export class ContentDataLayer extends BaseDataLayer {
 				source: "DL.content.listContent",
 				input,
 			}),
-		).map((rows) => {
-			const hasMore = rows.length > pageSize;
-			const data = hasMore ? rows.slice(0, pageSize) : rows;
-			const last = data[data.length - 1];
+		).map((fetched) => {
+			const hasMore = fetched.length > pageSize;
+			const page = hasMore ? fetched.slice(0, pageSize) : fetched;
+			const rows = backward ? page.reverse() : page;
 
-			if (!hasMore || last === undefined) {
-				return { rows: data, nextCursor: null };
+			const cursorOf = (row: (typeof rows)[number]) =>
+				sort
+					? encodeSortCursor({
+							value:
+								sort.column === "created_at" ? row.createdAt : row.updatedAt,
+							id: row.id,
+						})
+					: row.id;
+
+			const first = rows[0];
+			const last = rows[rows.length - 1];
+
+			if (backward) {
+				return {
+					rows,
+					nextCursor: last ? cursorOf(last) : null,
+					prevCursor: hasMore && first ? cursorOf(first) : null,
+				};
 			}
 
-			const nextCursor = sort
-				? encodeSortCursor({
-						value: sort.column === "created_at" ? last.createdAt : last.updatedAt,
-						id: last.id,
-					})
-				: last.id;
+			const hasCursor = sort ? sortCursor !== undefined : input.cursor !== undefined;
 
-			return { rows: data, nextCursor };
+			return {
+				rows,
+				nextCursor: hasMore && last ? cursorOf(last) : null,
+				prevCursor: hasCursor && first ? cursorOf(first) : null,
+			};
 		});
 	}
 
