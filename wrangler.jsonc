@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "pouch-git",
+	"name": "pouch-cms",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-09-27",
 	"compatibility_flags": ["nodejs_als", "global_fetch_strictly_public"],
@@ -11,21 +11,21 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "pouch-git",
-			"database_id": "113b5e53-18a8-4e6e-b28e-edb3fd5a3317",
+			"database_name": "pouch-cms",
+			"database_id": "00000000-0000-0000-0000-000000000000",
 			"migrations_dir": "src/lib/db/migrations"
 		}
 	],
 	"r2_buckets": [
 		{
 			"binding": "MEDIA_BUCKET",
-			"bucket_name": "pouch-media","preview_bucket_name": "pouch-media"
+			"bucket_name": "pouch-media"
 		}
 	],
 	"kv_namespaces": [
 		{
 			"binding": "OAUTH_KV",
-			"id": "9c3967703f2a4eba869b005cff2ca0b3"
+			"id": "00000000-0000-0000-0000-000000000000"
 		}
 	],
 	"ratelimits": [
@@ -36,7 +36,7 @@
 		}
 	],
 	"vars": {
-		"MEDIA_PUBLIC_URL": "https://pouch-media.zomunk.dev"
+		"MEDIA_PUBLIC_URL": "http://localhost:3200"
 	},
 	"secrets": {
 		"required": ["JWT_SECRET", "DOCS_SECRET", "MCP_ADMIN_SECRET"]
