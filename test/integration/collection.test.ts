@@ -43,6 +43,29 @@ describe("collections", () => {
 			expect(version!.id).toBe(body.currentSchemaVersionId);
 			expect(JSON.parse(version!.schema)).toEqual(schema);
 		});
+
+		it("returns every validation error in cause, not just the first", async () => {
+			const token = await adminToken();
+			const response = await fetchWorker(
+				"/collections",
+				{
+					method: "POST",
+					body: JSON.stringify({ bogus: true }),
+				},
+				token,
+			);
+
+			expect(response.status).toBe(400);
+
+			const body = (await response.json()) as {
+				code: string;
+				cause: Array<{ path: string; message: string }>;
+			};
+			expect(body.code).toBe("VALIDATION_FAILED");
+			expect(Array.isArray(body.cause)).toBe(true);
+			expect(body.cause.length).toBeGreaterThan(1);
+			expect(body.cause[0]).toHaveProperty("message");
+		});
 	});
 
 	describe("PATCH /collections/:slug/schema", () => {

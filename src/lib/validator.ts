@@ -13,6 +13,10 @@ const validate = <T>(value: unknown, schema: object, message: string): T => {
 			code: ErrorCodes.VALIDATION_FAILED,
 			message: firstError?.message ?? message,
 			status: 400,
+			cause: errors.map((error) => ({
+				path: error.instancePath,
+				message: error.message,
+			})),
 		});
 	}
 
