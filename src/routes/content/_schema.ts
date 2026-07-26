@@ -122,10 +122,11 @@ export type ContentRouteParams = Type.Static<typeof contentRouteParamsSchema>;
 export const contentQuerySchema = Type.Object(
 	{
 		limit: Type.Optional(Type.String()),
-		cursor: Type.Optional(Type.String({ pattern: "^con_" })),
+		cursor: Type.Optional(Type.String()),
 		resolve: Type.Optional(
 			Type.Union([Type.String(), Type.Array(Type.String())]),
 		),
+		sort: Type.Optional(Type.String()),
 	},
 	{ additionalProperties: true },
 );

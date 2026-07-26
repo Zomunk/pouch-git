@@ -109,8 +109,19 @@ const buildContentQueryParameters = (
 			required: false,
 			schema: {
 				type: "string",
-				pattern: "^con_",
-				description: "ID of the last item from the previous page.",
+				description:
+					"Pagination cursor. Pass the nextCursor value from the previous response verbatim.",
+			},
+		},
+		{
+			name: "sort",
+			in: "query",
+			required: false,
+			schema: {
+				type: "string",
+				enum: ["createdAt", "-createdAt", "updatedAt", "-updatedAt"],
+				description:
+					"Sort order. Prefix with - for descending. Defaults to newest first.",
 			},
 		},
 	];

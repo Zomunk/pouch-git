@@ -1,6 +1,7 @@
 import { err, ok, ResultAsync, safeTry } from "neverthrow";
 
-import type { ContentFilter, DataLayerError } from "@/lib/data";
+import type { ContentFilter, ContentSort, DataLayerError } from "@/lib/data";
+import { decodeSortCursor, type SortCursor } from "@/lib/data/content";
 import { AppHTTPException, ErrorCodes } from "@/lib/errors";
 import {
 	type FilterOperator,
@@ -58,7 +59,37 @@ const coerceFilterValue = (input: {
 	return coerceValue(stringValue, input.type);
 };
 
-const QUERY_META_KEYS = new Set(["resolve", "limit", "cursor"]);
+const QUERY_META_KEYS = new Set(["resolve", "limit", "cursor", "sort"]);
+
+const SORT_COLUMNS: Record<string, ContentSort["column"]> = {
+	createdAt: "created_at",
+	updatedAt: "updated_at",
+};
+
+const parseSort = (
+	raw: unknown,
+): { sort?: ContentSort; error?: AppHTTPException } => {
+	if (raw === undefined) {
+		return {};
+	}
+
+	const text = String(Array.isArray(raw) ? raw[0] : raw);
+	const direction = text.startsWith("-") ? "desc" : "asc";
+	const field = text.startsWith("-") ? text.slice(1) : text;
+	const column = SORT_COLUMNS[field];
+
+	if (!column) {
+		return {
+			error: new AppHTTPException({
+				code: ErrorCodes.VALIDATION_FAILED,
+				message: `Invalid sort field: ${field} (allowed: createdAt, updatedAt)`,
+				status: 400,
+			}),
+		};
+	}
+
+	return { sort: { column, direction } };
+};
 
 const parseLimit = (raw: unknown): number => {
 	if (raw === undefined) {
@@ -224,11 +255,37 @@ export const listContent = (
 		const cursor =
 			typeof input.query.cursor === "string" ? input.query.cursor : undefined;
 
+		const { sort, error: sortError } = parseSort(input.query.sort);
+
+		if (sortError) {
+			return err(sortError);
+		}
+
+		let sortCursor: SortCursor | undefined;
+
+		if (sort !== undefined && cursor !== undefined) {
+			const decoded = decodeSortCursor(cursor);
+
+			if (!decoded) {
+				return err(
+					new AppHTTPException({
+						code: ErrorCodes.VALIDATION_FAILED,
+						message: "Invalid cursor for sorted query",
+						status: 400,
+					}),
+				);
+			}
+
+			sortCursor = decoded;
+		}
+
 		const { rows, nextCursor } = yield* deps.DL.content.listContent({
 			collectionId: collection.id,
 			filters,
 			limit,
 			cursor,
+			sort,
+			sortCursor,
 		});
 
 		const enrichedRows = rows.map((row) => ({

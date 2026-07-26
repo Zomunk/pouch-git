@@ -88,6 +88,8 @@ Content list endpoints accept `?field=value` (equality) and `?field[op]=value`. 
 
 The top-level `status` field is also filterable (`eq`, `ne`, `in`, `nin`); it takes precedence over a schema property named `status`.
 
+Lists are newest-first by default (descending id). `?sort=createdAt|updatedAt` sorts ascending, prefix `-` for descending. Sorted queries use an opaque composite cursor — pass `nextCursor` verbatim.
+
 Both the request validator in `src/routes/content/_service.get.ts` and the OpenAPI generator in `src/routes/content/_openapi.ts` must derive allowed operators from the same mapping in `src/lib/query-filter.ts`.
 
 ## Schema philosophy

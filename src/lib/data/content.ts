@@ -1,5 +1,5 @@
 import { sql } from "kysely";
-import { fromPromise } from "neverthrow";
+import { fromPromise, Result } from "neverthrow";
 
 import { type AuditLogEvent } from "@/lib/audit-log";
 import { buildJsonExtractExpression } from "@/lib/content-index";
@@ -17,6 +17,54 @@ export type ContentFilter = {
 	value: string | number | boolean | (string | number | boolean)[];
 	/** When set, the filter targets a top-level content column instead of `data`. */
 	column?: "status";
+};
+
+export type ContentSort = {
+	column: "created_at" | "updated_at";
+	direction: "asc" | "desc";
+};
+
+export type SortCursor = { value: number; id: string };
+
+const encodeSortCursor = (cursor: SortCursor): string =>
+	btoa(JSON.stringify([cursor.value, cursor.id]))
+		.replaceAll("+", "-")
+		.replaceAll("/", "_")
+		.replaceAll("=", "");
+
+const BASE64URL_REGEX = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Decodes a composite sort cursor. Returns null when the cursor is malformed.
+ */
+export const decodeSortCursor = (cursor: string): SortCursor | null => {
+	if (!BASE64URL_REGEX.test(cursor)) {
+		return null;
+	}
+
+	const base64 = cursor.replaceAll("-", "+").replaceAll("_", "/");
+	const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+	const parsed = Result.fromThrowable(
+		() => JSON.parse(atob(padded)) as unknown,
+		() => null,
+	)();
+
+	if (parsed.isErr()) {
+		return null;
+	}
+
+	const value = parsed.value;
+
+	if (
+		!Array.isArray(value) ||
+		value.length !== 2 ||
+		typeof value[0] !== "number" ||
+		typeof value[1] !== "string"
+	) {
+		return null;
+	}
+
+	return { value: value[0], id: value[1] };
 };
 
 const OP_MAP: Record<Exclude<ContentFilter["op"], "in" | "nin">, string> = {
@@ -74,15 +122,27 @@ export class ContentDataLayer extends BaseDataLayer {
 		filters: ContentFilter[];
 		limit: number;
 		cursor?: string;
+		sort?: ContentSort;
+		sortCursor?: SortCursor;
 	}) {
 		const pageSize = input.limit;
+		const sort = input.sort;
+		const sortCursor = input.sortCursor;
 
 		return fromPromise(
 			this.contentQuery
 				.where("collection_id", "=", input.collectionId)
-				.$if(input.cursor !== undefined, (q) =>
+				.$if(input.cursor !== undefined && sort === undefined, (q) =>
 					q.where("id", "<", input.cursor!),
 				)
+				.$if(sort !== undefined && sortCursor !== undefined, (q) => {
+					const { column, direction } = sort!;
+					const cmp = direction === "asc" ? ">" : "<";
+
+					return q.where(
+						sql<boolean>`(${sql.ref(column)} ${sql.raw(cmp)} ${sortCursor!.value}) OR (${sql.ref(column)} = ${sortCursor!.value} AND id ${sql.raw(cmp)} ${sortCursor!.id})`,
+					);
+				})
 				.$if(input.filters.length > 0, (q) => {
 					let filtered = q;
 
@@ -92,7 +152,10 @@ export class ContentDataLayer extends BaseDataLayer {
 
 					return filtered;
 				})
-				.orderBy("id", "desc")
+				.$if(sort === undefined, (q) => q.orderBy("id", "desc"))
+				.$if(sort !== undefined, (q) =>
+					q.orderBy(sort!.column, sort!.direction).orderBy("id", sort!.direction),
+				)
 				.limit(pageSize + 1)
 				.execute(),
 			this.passThroughError({
@@ -104,7 +167,19 @@ export class ContentDataLayer extends BaseDataLayer {
 		).map((rows) => {
 			const hasMore = rows.length > pageSize;
 			const data = hasMore ? rows.slice(0, pageSize) : rows;
-			const nextCursor = hasMore ? (data[data.length - 1]?.id ?? null) : null;
+			const last = data[data.length - 1];
+
+			if (!hasMore || last === undefined) {
+				return { rows: data, nextCursor: null };
+			}
+
+			const nextCursor = sort
+				? encodeSortCursor({
+						value: sort.column === "created_at" ? last.createdAt : last.updatedAt,
+						id: last.id,
+					})
+				: last.id;
+
 			return { rows: data, nextCursor };
 		});
 	}
