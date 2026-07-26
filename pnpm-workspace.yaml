@@ -1,0 +1,5 @@
+packages:
+  - "client"
+
+onlyBuiltDependencies:
+  - better-sqlite3
