@@ -28,7 +28,19 @@ type JsonSchemaProperty = {
 
 const buildParameterSchema = (
 	property: JsonSchemaProperty,
+	op: string,
 ): Record<string, unknown> => {
+	if (
+		(op === "in" || op === "nin") &&
+		property.enum &&
+		property.type === "string"
+	) {
+		return {
+			type: "string",
+			description: "Comma-separated values.",
+		};
+	}
+
 	const schema: Record<string, unknown> = {};
 
 	if (property.enum) {
@@ -119,9 +131,8 @@ const buildContentQueryParameters = (
 			required: false,
 			schema: {
 				type: "string",
-				enum: ["createdAt", "-createdAt", "updatedAt", "-updatedAt"],
 				description:
-					"Sort order. Prefix with - for descending. Defaults to newest first.",
+					"Sort field. Any x-index scalar field (e.g. createdAt, updatedAt, or an indexed data field). Prefix with - for descending. Defaults to newest first.",
 			},
 		},
 		{
@@ -167,7 +178,7 @@ const buildContentQueryParameters = (
 				name,
 				in: "query",
 				required: false,
-				schema: buildParameterSchema(property),
+				schema: buildParameterSchema(property, op),
 			});
 		}
 	}
