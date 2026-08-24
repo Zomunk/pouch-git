@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 
 import { fetchWorker, readerToken } from "../utils";
+
+const codeChallenge = (verifier: string) =>
+	createHash("sha256").update(verifier).digest("base64url");
 
 const registerClient = async (
 	input: { clientName?: string; redirectUris?: string[] } = {},
@@ -36,10 +40,11 @@ describe("oauth consent flow", () => {
 		};
 
 		const verifier = "test-verifier-test-verifier-test-verifier";
+		const challenge = codeChallenge(verifier);
 		const authPath =
 			`/authorize?response_type=code&client_id=${clientId}` +
 			`&redirect_uri=${encodeURIComponent("https://client.example/callback")}` +
-			`&code_challenge=${verifier}&code_challenge_method=plain` +
+			`&code_challenge=${challenge}&code_challenge_method=S256` +
 			`&state=teststate&scope=${encodeURIComponent("content:read content:write")}`;
 		const authUrl = `http://example.com${authPath}`;
 
@@ -170,10 +175,11 @@ describe("oauth consent flow", () => {
 		};
 
 		const verifier = "test-verifier-test-verifier-test-verifier";
+		const challenge = codeChallenge(verifier);
 		const authPath =
 			`/authorize?response_type=code&client_id=${clientId}` +
 			`&redirect_uri=${encodeURIComponent("https://client.example/callback")}` +
-			`&code_challenge=${verifier}&code_challenge_method=plain` +
+			`&code_challenge=${challenge}&code_challenge_method=S256` +
 			`&scope=${encodeURIComponent("content:read bogus:scope")}`;
 		const authUrl = `http://example.com${authPath}`;
 
@@ -212,5 +218,40 @@ describe("mcp authentication", () => {
 		expect(response.status).toBe(200);
 		const text = await response.text();
 		expect(text).toContain("HTTP 200");
+	});
+});
+
+describe("cimd (client id metadata documents)", () => {
+	it("returns a clean error for a URL-shaped client_id with an unreachable host", async () => {
+		// A URL-shaped client_id triggers CIMD lookup in the new library.
+		// Since the host is unreachable, we expect a clean invalid_client/400 error,
+		// NOT a 500 or hang.
+		const verifier = "test-verifier-test-verifier-test-verifier";
+		const challenge = codeChallenge(verifier);
+		const clientId = "https://unreachable-host.invalid/metadata.json";
+		const authPath =
+			`/authorize?response_type=code&client_id=${clientId}` +
+			`&redirect_uri=${encodeURIComponent("https://client.example/callback")}` +
+			`&code_challenge=${challenge}&code_challenge_method=S256` +
+			`&state=teststate&scope=${encodeURIComponent("content:read")}`;
+
+		const response = await fetchWorker(authPath);
+
+		// Should be 400 (invalid_client) or 401 (login page), but NOT 500
+		expect(response.status).toBeLessThan(500);
+		// The response should not indicate an internal server error
+		const text = await response.text();
+		expect(text).not.toContain("Internal Server Error");
+		expect(text).not.toContain("500");
+	});
+
+	it("still works with dynamically registered clients (DCR)", async () => {
+		// Verify that DCR (POST /register) still works after the library upgrade
+		const response = await registerClient({ clientName: "CIMD Test Client" });
+
+		expect(response.status).toBe(201);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.client_id).toEqual(expect.any(String));
+		expect(body.client_name).toBe("CIMD Test Client");
 	});
 });
