@@ -1,7 +1,10 @@
-import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
+import {
+	OAuthProvider,
+	type OAuthProviderOptions,
+} from "@cloudflare/workers-oauth-provider";
 
 import {
-	baseOAuthProviderOptions,
+	buildOAuthProviderOptions,
 	OAUTH_AUTHORIZE_ENDPOINT,
 	resolveExternalPouchToken,
 } from "@/lib/oauth";
@@ -17,13 +20,13 @@ export default {
 		ctx: ExecutionContext,
 	): Promise<Response> {
 		const oauthProvider = new OAuthProvider({
-			...baseOAuthProviderOptions,
+			...(buildOAuthProviderOptions(env) as OAuthProviderOptions<Env>),
 			apiRoute: "/mcp",
 			apiHandler: app,
-			resolveExternalToken: ({ token }) =>
-				resolveExternalPouchToken(token, env),
+			resolveExternalToken: (input) =>
+				resolveExternalPouchToken({ ...input, env }),
 			defaultHandler: {
-				async fetch(req: Request, e: Env, executionCtx: ExecutionContext) {
+				async fetch(req, e, executionCtx) {
 					// The OAuth consent flow is handled by its own router; everything
 					// else falls through to the existing Hono app untouched.
 					const url = new URL(req.url);

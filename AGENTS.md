@@ -129,8 +129,9 @@ For contributor-facing how-tos (adding routes, scopes, DB changes), see [CONTRIB
 
 ## OAuth for MCP
 
-- OAuth clients self-register via RFC 7591 DCR at `POST /register` (enabled via `clientRegistrationEndpoint` in `src/lib/oauth.ts`), stored in `OAUTH_KV` by the library. There is no operator-managed client registry.
-- DCR-registered clients expire after the library default of 90 days; clients are expected to re-register.
+- Clients identify via Client ID Metadata Documents (CIMD, draft-ietf-oauth-client-id-metadata-document): the `client_id` is an HTTPS URL hosting the client's metadata, which the provider fetches, validates, and caches (enabled via `clientIdMetadataDocumentEnabled` in `src/lib/oauth.ts`). There is no operator-managed client registry.
+- RFC 7591 DCR at `POST /register` remains enabled for legacy clients, stored in `OAUTH_KV` by the library. DCR-registered clients expire after the library default of 90 days and re-register on demand. Prefer CIMD for anything new; DCR is slated for removal.
+- A failed CIMD metadata fetch surfaces as `CimdFetchError` from the library (e.g. from `lookupClient`); the consent flow converts it to a clean 400 JSON error — never let it escape as an unhandled 500.
 - Clients are public (PKCE-only, `tokenEndpointAuthMethod: "none"`). Never issue client secrets.
 - Client lookups outside the provider wrapper (e.g. the consent flow) use `getOAuthHelpers(env).lookupClient(clientId)` from `src/lib/oauth.ts` — there is no data layer for OAuth clients.
 - The consent flow (`GET/POST /authorize`) lives in `src/routes/oauth/` and renders JSX pages via `hono/jsx`. Human-facing pages use the shared `Layout` from `src/routes/oauth/Layout.tsx` — fully self-contained, styles inlined, no static assets.

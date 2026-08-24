@@ -10,6 +10,7 @@ interface __BaseEnv_Env {
   JWT_SECRET: string;
   DOCS_SECRET: string;
   MCP_ADMIN_SECRET: string;
+  MCP_RESOURCE_URL?: string;
 }
 declare namespace Cloudflare {
   interface GlobalProps {

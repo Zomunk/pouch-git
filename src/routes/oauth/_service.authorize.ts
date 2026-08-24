@@ -1,3 +1,4 @@
+import { CimdFetchError } from "@cloudflare/workers-oauth-provider";
 import { sign } from "hono/jwt";
 import {
 	err,
@@ -57,12 +58,19 @@ const requireRegisteredClient = (
 		const client = yield* ResultAsync.fromPromise(
 			getOAuthHelpers(deps.env).lookupClient(input.clientId),
 			(cause) =>
-				new AppHTTPException({
-					code: ErrorCodes.INTERNAL_ERROR,
-					message: "Failed to look up OAuth client",
-					status: 500,
-					cause,
-				}),
+				cause instanceof CimdFetchError
+					? new AppHTTPException({
+							code: ErrorCodes.VALIDATION_FAILED,
+							message: "Client metadata document could not be fetched",
+							status: 400,
+							cause,
+						})
+					: new AppHTTPException({
+							code: ErrorCodes.INTERNAL_ERROR,
+							message: "Failed to look up OAuth client",
+							status: 500,
+							cause,
+						}),
 		);
 
 		if (client === null || !client.redirectUris.includes(input.redirectUri)) {
@@ -149,13 +157,20 @@ export const completeConsent = (
 
 		const authRequest = yield* ResultAsync.fromPromise(
 			helpers.parseAuthRequest(new Request(returnUrlObj.toString())),
-			(error) =>
-				invalidRequest(
-					error instanceof Error
-						? error.message
-						: "Invalid authorization request",
-					error,
-				),
+			(cause) =>
+				cause instanceof CimdFetchError
+					? new AppHTTPException({
+							code: ErrorCodes.VALIDATION_FAILED,
+							message: "Client metadata document could not be fetched",
+							status: 400,
+							cause,
+						})
+					: invalidRequest(
+							cause instanceof Error
+								? cause.message
+								: "Invalid authorization request",
+							cause,
+						),
 		);
 
 		const client = yield* requireRegisteredClient(

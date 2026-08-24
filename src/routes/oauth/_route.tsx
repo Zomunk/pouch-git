@@ -1,3 +1,4 @@
+import { CimdFetchError } from "@cloudflare/workers-oauth-provider";
 import type { Context } from "hono";
 import { getSignedCookie, setSignedCookie } from "hono/cookie";
 import { Result, ResultAsync } from "neverthrow";
@@ -45,7 +46,7 @@ const resolveClientName = async (
 	const client = (
 		await ResultAsync.fromPromise(
 			getOAuthHelpers(c.env).lookupClient(clientId),
-			() => null,
+			(cause) => (cause instanceof CimdFetchError ? null : cause),
 		)
 	).unwrapOr(null);
 	return client?.clientName ?? undefined;
